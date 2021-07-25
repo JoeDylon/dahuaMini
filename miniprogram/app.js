@@ -13,7 +13,12 @@ App({
         traceUser: true,
       })
     }
-
-    this.globalData = {}
+    const sysInfo = wx.getSystemInfoSync()
+    const menuBtnInfo = wx.getMenuButtonBoundingClientRect();
+    this.globalData = {
+      statusBarHeight: sysInfo.statusBarHeight,
+      navbarHeight: (menuBtnInfo.top - sysInfo.statusBarHeight) * 2 + menuBtnInfo.height
+    }
+    // console.log(this.globalData)
   }
 })

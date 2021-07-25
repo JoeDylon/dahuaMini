@@ -1,0 +1,20 @@
+/* components/CompanyInfoCard/CompanyInfoCard.wxss */
+.container {
+  box-sizing: border-box;
+  margin: 10px;
+  height: 100%;
+  position: relative;
+}
+
+.title {
+  font-size: large;
+  margin-bottom: 10px;
+}
+
+.page-link {
+  /* position: absolute;
+  bottom: 10px; */
+  margin-top: 5px;
+  width: 100%;
+  text-align: center;
+}

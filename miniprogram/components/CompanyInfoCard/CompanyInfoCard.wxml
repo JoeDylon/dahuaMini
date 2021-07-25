@@ -1,0 +1,11 @@
+<!--components/CompanyInfoCard/CompanyInfoCard.wxml-->
+<view class="container">
+  <view class="title">{{companyInfo.name}}</view>
+  <van-cell-group>
+    <van-cell title="人数" value="{{companyInfo.employeeNumber}}" />
+    <van-cell title="主营" value="{{companyInfo.mainBusiness}}" />
+    <van-cell title="电话" value="{{companyInfo.phone}}" />
+    <van-cell title="详细地址" value="{{companyInfo.address}}" />
+  </van-cell-group>
+  <view class='page-link'>详情页</view>
+</view>

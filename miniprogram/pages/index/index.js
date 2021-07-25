@@ -1,75 +1,155 @@
+import Toast from '../../miniprogram_npm/@vant/weapp/toast/toast'
+import util from '../../util/util'
+
 //index.js
 const app = getApp()
+const INIT_MARKER = {
+  iconPath: './imgs/Marker1_Activated@3x.png',
+  width: '34px',
+  height: '34px',
+  rotate: 0,
+  alpha: 1
+};
 
 Page({
   data: {
-    avatarUrl: './user-unlogin.png',
-    userInfo: {},
-    hasUserInfo: false,
-    logged: false,
-    takeSession: false,
-    requestResult: '',
-    canIUseGetUserProfile: false,
-    canIUseOpenData: wx.canIUse('open-data.type.userAvatarUrl') // 如需尝试获取用户信息可改为false
+    latitude: 0,
+    longitude: 0,
+    currentCity: null,
+    selectorVisible: false,
+    leftText: '选择城市',
+    companyShow: false,
+    markers: null,
+    includePoints: [],
+    scale: 3,
+    key: '73FBZ-7N2CX-6VA4V-TWGPU-4RZQJ-D5BX4',
+    referer: '大丰华',
   },
 
-  onLoad: function() {
-    if (!wx.cloud) {
-      wx.redirectTo({
-        url: '../chooseLib/chooseLib',
-      })
-      return
-    }
-    if (wx.getUserProfile) {
-      this.setData({
-        canIUseGetUserProfile: true,
-      })
-    }
-  },
-
-  getUserProfile() {
-    // 推荐使用wx.getUserProfile获取用户信息，开发者每次通过该接口获取用户个人信息均需用户确认，开发者妥善保管用户快速填写的头像昵称，避免重复弹窗
-    wx.getUserProfile({
-      desc: '展示用户信息', // 声明获取用户个人信息后的用途，后续会展示在弹窗中，请谨慎填写
+  onLoad: function () {
+    // 获取定位
+    wx.getLocation({
+      type: 'gcj02',
       success: (res) => {
         this.setData({
-          avatarUrl: res.userInfo.avatarUrl,
-          userInfo: res.userInfo,
-          hasUserInfo: true,
+          latitude: Number(res.latitude).toString(),
+          longitude: Number(res.longitude).toString(),
+          markers: null,
         })
       }
     })
   },
 
-  onGetUserInfo: function(e) {
-    if (!this.data.logged && e.detail.userInfo) {
-      this.setData({
-        logged: true,
-        avatarUrl: e.detail.userInfo.avatarUrl,
-        userInfo: e.detail.userInfo,
-        hasUserInfo: true,
-      })
-    }
+  zoomOut: function () {
+    if (this.data.scale >= 20) return;
+    this.setData({
+      scale: this.data.scale + 1,
+    })
   },
 
-  onGetOpenid: function() {
-    // 调用云函数
-    wx.cloud.callFunction({
-      name: 'login',
-      data: {},
-      success: res => {
-        console.log('[云函数] [login] user openid: ', res.result.openid)
-        app.globalData.openid = res.result.openid
-        wx.navigateTo({
-          url: '../userConsole/userConsole',
-        })
+  zoomIn: function () {
+    if (this.data.scale <= 3) return;
+    this.setData({
+      scale: this.data.scale - 1,
+    })
+  },
+
+  onSelectCity: async function (e) {
+    const city = e.detail.city.name
+    if (this.data.currentCity === city) return
+    // 切换位置
+    const latitude = Number(e.detail.city.location.latitude)
+    const longitude = Number(e.detail.city.location.longitude)
+    this.setData({
+      latitude: latitude.toString(),
+      longitude: longitude.toString(),
+      leftText: e.detail.city.name,
+    })
+    // 获取在该城市经营的公司
+    wx.showLoading({
+      title: '查询中',
+    })
+    const {
+      result: companies
+    } = await wx.cloud.callFunction({
+      name: 'queryCompanies',
+      data: {
+        city,
       },
-      fail: err => {
-        console.error('[云函数] [login] 调用失败', err)
-        wx.navigateTo({
-          url: '../deployFunctions/deployFunctions',
-        })
+    })
+    wx.hideLoading()
+    if (companies.length === 0) {
+      Toast(`在${city}没有往来的工厂`);
+      return;
+    }
+    const markers = companies.map((company, index) => {
+      return {
+        ...INIT_MARKER,
+        callout: {
+          fontSize: '12px',
+          content: company.companyInfo.name,
+          padding: 10,
+          borderRadius: 2,
+          display: 'ALWAYS'
+        },
+        latitude: company.companyInfo.latitude,
+        longitude: company.companyInfo.longitude,
+        id: index,
       }
+    })
+    const includePoints = companies.map((company) => {
+      return {
+        latitude: company.companyInfo.latitude,
+        longitude: company.companyInfo.longitude,
+      }
+    })
+    this.setData({
+      markers,
+      companies,
+    })
+    setTimeout(() => {
+      this.setData({
+        includePoints
+      })
+    }, 500)
+  },
+
+  onMarkerTap: function (e) {
+    const {
+      detail: {
+        markerId
+      }
+    } = e;
+    if (this.data.currentMarkerId !== undefined) {
+      const LasttimeMarker = this.data.markers.find(marker => marker.id === this.data.currentMarkerId)
+      LasttimeMarker.callout.fontSize = '12px'
+      LasttimeMarker.width = '34px'
+      LasttimeMarker.height = '34px'
+    }
+    const selectedMarker = this.data.markers.find(marker => marker.id === markerId)
+    const selectedCompanyIndex = this.data.markers.findIndex((marker) => marker === selectedMarker)
+    selectedMarker.callout.fontSize = '16px'
+    selectedMarker.width = '60px'
+    selectedMarker.height = '60px'
+    this.setData({
+      markers: this.data.markers,
+      selectedCompany: this.data.companies[selectedCompanyIndex],
+      currentMarkerId: markerId,
+      companyShow: true,
+    });
+  },
+
+  onCompanyClose: function (e) {
+    this.setData({
+      companyShow: false
+    })
+  },
+
+  onClickLeft: function () {
+    this.setData({
+      selectorVisible: true,
+      // markers: false,
+      // includePoints: false,
     })
   },
 
@@ -86,7 +166,8 @@ Page({
         })
 
         const filePath = res.tempFilePaths[0]
-        
+        console.log(res.tempFilePaths[0])
+
         // 上传图片
         const cloudPath = `my-image${filePath.match(/\.[^.]+?$/)[0]}`
         wx.cloud.uploadFile({
@@ -98,7 +179,7 @@ Page({
             app.globalData.fileID = res.fileID
             app.globalData.cloudPath = cloudPath
             app.globalData.imagePath = filePath
-            
+
             wx.navigateTo({
               url: '../storageConsole/storageConsole'
             })
